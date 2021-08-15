@@ -48,12 +48,21 @@ namespace WordFilter
         {
             var input = Environment.CurrentDirectory + "/web2";
 
+            var requestsRemaining = 1000;
+
             using (StreamReader streamReader = new StreamReader(input))
             {
                 string line = null;
 
                 while ((line = streamReader.ReadLine()) != null)
                 {
+                    if (requestsRemaining < 100)
+                    {
+                        Console.WriteLine("Requests are about to finish");
+                        Console.WriteLine("Next word is " + line);
+                        return;
+                    }
+                    
                     var word = line.ToLower();
                     if (line != word) continue;
                     
@@ -77,6 +86,12 @@ namespace WordFilter
                     
                     Console.WriteLine(response.Content);
 
+                    requestsRemaining = response.Headers
+                        .Where(h => h.Name == "X-RateLimit-requests-Remaining")
+                        .Select(h => h.Value != null ? int.Parse(h.Value.ToString()) : 0)
+                        .FirstOrDefault();
+                    Console.WriteLine("Requests remaining: " + requestsRemaining);
+
                     if (response.IsSuccessful)
                     {
                         var data = SimpleJson.DeserializeObject<WordInfo>(response.Content);
@@ -85,7 +100,7 @@ namespace WordFilter
                             entry.Frequency = data.frequency;
                             
                             db.Insert(entry);
-                            Console.WriteLine(entry.Id);
+                            Console.WriteLine("Word id: " + entry.Id);
 
                             for (var i = 0; i < data.results.Length; i++)
                             {
