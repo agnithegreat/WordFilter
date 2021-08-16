@@ -50,7 +50,7 @@ namespace WordFilter
             
             if (!File.Exists(input)) return;
 
-            var requestsRemaining = 1000;
+            var requestsRemaining = 10;
 
             using (StreamReader streamReader = new StreamReader(input))
             {
@@ -58,7 +58,7 @@ namespace WordFilter
 
                 while ((line = streamReader.ReadLine()) != null)
                 {
-                    if (requestsRemaining < 100)
+                    if (requestsRemaining < 10)
                     {
                         Console.WriteLine("Requests are about to finish");
                         Console.WriteLine("Next word is " + line);
