@@ -47,6 +47,8 @@ namespace WordFilter
         private static void InsertFromFile(SQLiteConnection db)
         {
             var input = Environment.CurrentDirectory + "/web2";
+            
+            if (!File.Exists(input)) return;
 
             var requestsRemaining = 1000;
 
