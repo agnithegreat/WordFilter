@@ -17,6 +17,7 @@ namespace WordFilter
             db.CreateTable<WordDefinitionEntry>();
 
             InsertFromFile(db);
+            CollectDefinitions(db);
             
             var table = db.Table<WordEntry>();
 
@@ -118,6 +119,66 @@ namespace WordFilter
             }
         }
         
+        private static void CollectDefinitions(SQLiteConnection db)
+        {
+            var requestsRemaining = 10;
+
+            var words = db.Table<WordEntry>();
+            
+            foreach (var entry in words)
+            {
+                var word = entry.Word;
+                if (db.Table<WordDefinitionEntry>().FirstOrDefault(w => w.WordId == entry.Id) != null) continue;
+                
+                if (requestsRemaining < 10)
+                {
+                    Console.WriteLine("Requests are about to finish");
+                    Console.WriteLine("Next word is " + word);
+                    return;
+                }
+                
+                var client = new RestClient($"https://wordsapiv1.p.rapidapi.com/words/{word}");
+                var request = new RestRequest(Method.GET);
+                request.AddHeader("x-rapidapi-key", "ad8e1cadd3msh5b1378982a81bcap15080fjsn8d942992b7ad");
+                request.AddHeader("x-rapidapi-host", "wordsapiv1.p.rapidapi.com");
+                IRestResponse response = client.Execute(request);
+                
+                Console.WriteLine(response.Content);
+
+                requestsRemaining = response.Headers
+                    .Where(h => h.Name == "X-RateLimit-requests-Remaining")
+                    .Select(h => h.Value != null ? int.Parse(h.Value.ToString()) : 0)
+                    .FirstOrDefault();
+                Console.WriteLine("Requests remaining: " + requestsRemaining);
+
+                if (response.IsSuccessful)
+                {
+                    var data = SimpleJson.DeserializeObject<WordInfo>(response.Content);
+                    if (data.results != null)
+                    {
+                        for (var i = 0; i < data.results.Length; i++)
+                        {
+                            var result = data.results[i];
+                            db.Insert(new WordDefinitionEntry
+                            {
+                                WordId = entry.Id,
+                                Definition = result.definition,
+                                PartOfSpeech = result.partOfSpeech,
+                                Synonyms = result.synonyms != null ? String.Join("\n", result.synonyms) : "",
+                                InCategory = result.inCategory != null ? String.Join("\n", result.inCategory) : "",
+                                TypeOf = result.typeOf != null ? String.Join("\n", result.typeOf) : "",
+                                HasTypes = result.hasTypes != null ? String.Join("\n", result.hasTypes) : "",
+                                HasMembers = result.hasMembers != null ? String.Join("\n", result.hasMembers) : "",
+                                Derivation = result.derivation != null ? String.Join("\n", result.derivation) : "",
+                                Examples = result.examples != null ? String.Join("\n", result.examples) : "",
+                            });
+                        }
+                    }
+                }
+            }
+
+        }
+        
         private static string Roll(TableQuery<WordEntry> table, int value)
         {
             var random = new Random();
@@ -194,6 +255,14 @@ namespace WordFilter
             public int WordId { get; set; }
             
             public string Definition { get; set; }
+            public string PartOfSpeech { get; set; }
+            public string Synonyms { get; set; }
+            public string InCategory { get; set; }
+            public string TypeOf { get; set; }
+            public string HasTypes { get; set; }
+            public string HasMembers { get; set; }
+            public string Derivation { get; set; }
+            public string Examples { get; set; }
         }
 
         public class WordInfo
